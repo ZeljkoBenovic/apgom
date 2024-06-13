@@ -1,13 +1,21 @@
 package asterisk
 
+import "github.com/ZeljkoBenovic/apgom/internal/ami"
+
 type AsteriskScraper struct {
+	ami *ami.Ami
 }
 
-func NewAsteriskScraper() *AsteriskScraper {
-	return &AsteriskScraper{}
+func NewAsteriskScraper(ami *ami.Ami) *AsteriskScraper {
+	return &AsteriskScraper{
+		ami: ami,
+	}
 }
 
-func (as *AsteriskScraper) GetSIPChannels() float64 {
-	// TODO: implement actual scraping logic
-	return 2
+func (as *AsteriskScraper) GetActiveCalls() float64 {
+	return as.ami.GetActiveCalls()
+}
+
+func (as *AsteriskScraper) GetTotalProcessedCalls() float64 {
+	return as.ami.GetTotalProcessedCalls()
 }

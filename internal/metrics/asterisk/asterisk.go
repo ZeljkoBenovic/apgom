@@ -1,13 +1,16 @@
 package asterisk
 
 import (
+	"time"
+
 	"github.com/ZeljkoBenovic/apgom/internal/scrapers/asterisk"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type MetricsAsterisk struct {
-	sipChannels     prometheus.Gauge
+	activeCalls     prometheus.Gauge
+	totalCalls      prometheus.Gauge
 	asteriskScraper *asterisk.AsteriskScraper
 }
 
@@ -17,18 +20,31 @@ func NewMetricsAsterisk(asteriskScraper *asterisk.AsteriskScraper) *MetricsAster
 	}
 }
 
-func (m *MetricsAsterisk) SipChannel() {
-	m.sipChannels = promauto.NewGauge(prometheus.GaugeOpts{
+func (m *MetricsAsterisk) ActiveCalls() {
+	m.activeCalls = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace:   "asterisk",
-		Name:        "sip_channels",
-		Help:        "The number of Asterisk SIP channels",
+		Name:        "active_calls",
+		Help:        "The number of active calls",
 		ConstLabels: nil,
 	})
-
-	m.getSipChannels()
 }
 
-func (m *MetricsAsterisk) getSipChannels() {
-	// TODO: implement asterisk scraping module
-	m.sipChannels.Set(m.asteriskScraper.GetSIPChannels())
+func (m *MetricsAsterisk) TotalProcessedCalls() {
+	m.totalCalls = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace:   "asterisk",
+		Name:        "total_calls",
+		Help:        "The number of total processed calls",
+		ConstLabels: nil,
+	})
+}
+
+func (m *MetricsAsterisk) RunAsteriskMetricsCollector() {
+	//TODO: add context
+	for {
+		select {
+		case <-time.After(time.Second):
+			m.activeCalls.Set(m.asteriskScraper.GetActiveCalls())
+			m.totalCalls.Set(m.asteriskScraper.GetTotalProcessedCalls())
+		}
+	}
 }

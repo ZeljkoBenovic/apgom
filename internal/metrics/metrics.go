@@ -1,17 +1,25 @@
 package metrics
 
 import (
+	"github.com/ZeljkoBenovic/apgom/internal/ami"
 	"github.com/ZeljkoBenovic/apgom/internal/metrics/asterisk"
 	scraperAsterisk "github.com/ZeljkoBenovic/apgom/internal/scrapers/asterisk"
 )
 
 type Metrics struct {
-	AsteriskMetrics *asterisk.MetricsAsterisk
+	asteriskMetrics *asterisk.MetricsAsterisk
 }
 
-func NewMetrics() *Metrics {
-	asteriskMetrics := asterisk.NewMetricsAsterisk(scraperAsterisk.NewAsteriskScraper())
+func NewMetrics(ami *ami.Ami) *Metrics {
+	asteriskMetrics := asterisk.NewMetricsAsterisk(scraperAsterisk.NewAsteriskScraper(ami))
 	return &Metrics{
-		AsteriskMetrics: asteriskMetrics,
+		asteriskMetrics: asteriskMetrics,
 	}
+}
+
+func (m *Metrics) StartAsteriskMetrics() {
+	m.asteriskMetrics.ActiveCalls()
+	m.asteriskMetrics.TotalProcessedCalls()
+
+	go m.asteriskMetrics.RunAsteriskMetricsCollector()
 }
