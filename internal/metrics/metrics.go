@@ -23,9 +23,12 @@ func NewMetrics(ctx context.Context, ami *ami.Ami) *Metrics {
 func (m *Metrics) StartAsteriskMetrics() {
 	m.asteriskMetrics.ActiveCalls()
 	m.asteriskMetrics.TotalProcessedCalls()
-	m.asteriskMetrics.GetTotalPeers()
-	m.asteriskMetrics.GetAvailablePeers()
-	m.asteriskMetrics.GetUnavailablePeers()
+	m.asteriskMetrics.TotalExtensions()
+	m.asteriskMetrics.AvailableExtensions()
+	m.asteriskMetrics.UnavailableExtensions()
+	m.asteriskMetrics.RegisteredRegistries()
+	m.asteriskMetrics.UnRegisteredRegistries()
+	m.asteriskMetrics.TotalRegistries()
 
 	go m.asteriskMetrics.RunAsteriskMetricsCollector()
 }

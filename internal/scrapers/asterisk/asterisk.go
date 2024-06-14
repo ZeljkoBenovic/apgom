@@ -19,3 +19,7 @@ func (as *AsteriskScraper) GetActiveAndTotalCalls() (activeCalls, totalCalls flo
 func (as *AsteriskScraper) GetExtensions() (availableExtensions, unavailableExtensions, totalExtensions float64) {
 	return as.ami.GetExtensions()
 }
+
+func (as *AsteriskScraper) GetRegistries() (registered, unRegistered, totalRegistries float64) {
+	return as.ami.GetRegistries()
+}

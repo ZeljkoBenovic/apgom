@@ -16,6 +16,8 @@ type Ami struct {
 	cl   *amigo.Amigo
 }
 
+// TODO: add support for PJSIP
+
 func NewAmi(conf config.Config, log *slog.Logger) (*Ami, error) {
 	cl := amigo.New(&amigo.Settings{
 		Username: conf.AsteriskAMIUser,
@@ -46,6 +48,55 @@ func NewAmi(conf config.Config, log *slog.Logger) (*Ami, error) {
 		log:  log,
 		cl:   cl,
 	}, nil
+}
+
+func (a *Ami) GetRegistries() (float64, float64, float64) {
+	var (
+		errCh        = make(chan error)
+		complete     = make(chan struct{})
+		registries   []map[string]string
+		registered   float64
+		unRegistered float64
+	)
+
+	if err := a.cl.RegisterHandler("RegistryEntry", func(m map[string]string) {
+		if m["State"] == "Registered" {
+			registered++
+		} else {
+			unRegistered++
+		}
+
+		registries = append(registries, m)
+	}); err != nil {
+		errCh <- fmt.Errorf("could not set registry entry handler: %w", err)
+	}
+
+	if err := a.cl.RegisterHandler("RegistrationsComplete", func(m map[string]string) {
+		complete <- struct{}{}
+	}); err != nil {
+		errCh <- fmt.Errorf("could not set registrations complete handler: %w", err)
+	}
+
+	defer func() {
+		_ = a.cl.UnregisterHandler("RegistrationsComplete", func(m map[string]string) {})
+		_ = a.cl.UnregisterHandler("Registry", func(m map[string]string) {})
+	}()
+
+	if _, err := a.cl.Action(map[string]string{
+		"Action": "SIPshowregistry",
+	}); err != nil {
+		errCh <- fmt.Errorf("could not send sipshowregistry action: %w", err)
+	}
+
+	for {
+		select {
+		case err := <-errCh:
+			a.log.Error("get registries error", "err", err)
+			return -1, -1, -1
+		case <-complete:
+			return registered, unRegistered, float64(len(registries))
+		}
+	}
 }
 
 func (a *Ami) GetActiveAndTotalCalls() (float64, float64) {
