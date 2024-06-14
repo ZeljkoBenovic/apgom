@@ -78,8 +78,11 @@ func (a *Ami) GetRegistries() (float64, float64, float64) {
 	}
 
 	defer func() {
-		_ = a.cl.UnregisterHandler("RegistrationsComplete", func(m map[string]string) {})
-		_ = a.cl.UnregisterHandler("Registry", func(m map[string]string) {})
+		err := a.cl.UnregisterHandler("RegistrationsComplete", func(m map[string]string) {})
+		err = a.cl.UnregisterHandler("RegistryEntry", func(m map[string]string) {})
+		if err != nil {
+			a.log.Error("unregister handler error", "err", err)
+		}
 	}()
 
 	if _, err := a.cl.Action(map[string]string{
@@ -138,8 +141,11 @@ func (a *Ami) GetExtensions() (float64, float64, float64) {
 	}
 
 	defer func() {
-		_ = a.cl.UnregisterHandler("PeerEntry", func(m map[string]string) {})
-		_ = a.cl.UnregisterHandler("PeerlistComplete", func(m map[string]string) {})
+		err := a.cl.UnregisterHandler("PeerEntry", func(m map[string]string) {})
+		err = a.cl.UnregisterHandler("PeerlistComplete", func(m map[string]string) {})
+		if err != nil {
+			a.log.Error("unregister handler error", "err", err)
+		}
 	}()
 
 	if _, err := a.cl.Action(map[string]string{

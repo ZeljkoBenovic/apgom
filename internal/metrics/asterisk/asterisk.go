@@ -107,6 +107,7 @@ func (m *MetricsAsterisk) RunAsteriskMetricsCollector() {
 	for {
 		select {
 		case <-time.After(time.Second * 1):
+			// TODO: set debug log for when scraping stops
 			activeCalls, totalCalls := m.asteriskScraper.GetActiveAndTotalCalls()
 			availablePeers, unavailablePeers, totalPeers := m.asteriskScraper.GetExtensions()
 			registeredRegistries, unRegisteredRegistries, totalRegistries := m.asteriskScraper.GetRegistries()
