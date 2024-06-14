@@ -12,10 +12,10 @@ func NewAsteriskScraper(ami *ami.Ami) *AsteriskScraper {
 	}
 }
 
-func (as *AsteriskScraper) GetActiveCalls() float64 {
-	return as.ami.GetActiveCalls()
+func (as *AsteriskScraper) GetActiveAndTotalCalls() (activeCalls, totalCalls float64) {
+	return as.ami.GetActiveAndTotalCalls()
 }
 
-func (as *AsteriskScraper) GetTotalProcessedCalls() float64 {
-	return as.ami.GetTotalProcessedCalls()
+func (as *AsteriskScraper) GetExtensions() (availableExtensions, unavailableExtensions, totalExtensions float64) {
+	return as.ami.GetExtensions()
 }

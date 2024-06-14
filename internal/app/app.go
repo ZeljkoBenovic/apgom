@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,12 +15,14 @@ import (
 )
 
 type App struct {
+	ctx     context.Context
 	conf    config.Config
 	log     *slog.Logger
 	metrics *metrics.Metrics
 }
 
 func NewApp(conf config.Config) App {
+	ctx := context.Background()
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	am, err := ami.NewAmi(conf, log)
 	if err != nil {
@@ -29,8 +32,9 @@ func NewApp(conf config.Config) App {
 
 	go handleOsSignals(log)
 
-	mtrsc := metrics.NewMetrics(am)
+	mtrsc := metrics.NewMetrics(ctx, am)
 	return App{
+		ctx:     ctx,
 		conf:    conf,
 		log:     log,
 		metrics: mtrsc,
