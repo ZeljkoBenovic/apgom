@@ -1,0 +1,26 @@
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - env:
+      - CGO_ENABLED=1
+    binary: apgom
+    goarch:
+      - amd64
+    goos:
+      - linux
+    ldflags:
+      - -s -w -linkmode external -extldflags "-static"
+    tags:
+      - netgo
+      - static_build
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+checksum:
+  name_template: 'checksums.txt'
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
