@@ -32,7 +32,12 @@ func NewApp(conf config.Config) App {
 
 	go handleOsSignals(log)
 
-	mtrsc := metrics.NewMetrics(ctx, am)
+	mtrsc, err := metrics.NewMetrics(ctx, log, am)
+	if err != nil {
+		log.Error("could not setup new metrics", "err", err)
+		os.Exit(1)
+	}
+
 	return App{
 		ctx:     ctx,
 		conf:    conf,
@@ -42,7 +47,9 @@ func NewApp(conf config.Config) App {
 }
 
 func (a App) Run() error {
-	a.metrics.StartAsteriskMetrics()
+	if err := a.metrics.StartAsteriskMetrics(); err != nil {
+		return fmt.Errorf("could not start asterisk metrics: %v", err)
+	}
 
 	a.log.Info("starting metrics listener", slog.String("port", a.conf.MetricsHttpListenPort))
 
