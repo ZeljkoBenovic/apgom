@@ -24,6 +24,7 @@ type App struct {
 func NewApp(conf config.Config) App {
 	ctx := context.Background()
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
 	am, err := ami.NewAmi(conf, log)
 	if err != nil {
 		log.Error("could not create new ami instance", "err", err)
@@ -51,10 +52,24 @@ func (a App) Run() error {
 		return fmt.Errorf("could not start asterisk metrics: %v", err)
 	}
 
-	a.log.Info("starting metrics listener", slog.String("port", a.conf.MetricsHttpListenPort))
+	a.log.Info("starting metrics listener",
+		slog.String(
+			"on",
+			fmt.Sprintf(
+				"%s:%s%s",
+				a.conf.MetricsHttpListenHost,
+				a.conf.MetricsHttpListenPort,
+				a.conf.MetricsHttpListenPath,
+			),
+		),
+	)
 
-	http.Handle("/metrics", promhttp.Handler())
-	return http.ListenAndServe(fmt.Sprintf(":%s", a.conf.MetricsHttpListenPort), nil)
+	http.Handle(a.conf.MetricsHttpListenPath, promhttp.Handler())
+
+	return http.ListenAndServe(
+		fmt.Sprintf("%s:%s", a.conf.MetricsHttpListenHost, a.conf.MetricsHttpListenPort),
+		nil,
+	)
 }
 
 func handleOsSignals(log *slog.Logger) {
