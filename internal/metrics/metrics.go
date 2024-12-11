@@ -39,6 +39,7 @@ func (m *Metrics) StartAsteriskMetrics() error {
 	err = m.asteriskMetrics.RegisteredRegistries()
 	err = m.asteriskMetrics.UnRegisteredRegistries()
 	err = m.asteriskMetrics.TotalRegistries()
+	m.asteriskMetrics.CallsPerTrunk()
 
 	if err != nil {
 		return err

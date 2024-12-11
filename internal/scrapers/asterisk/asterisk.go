@@ -23,3 +23,7 @@ func (as *AsteriskScraper) GetExtensions() (availableExtensions, unavailableExte
 func (as *AsteriskScraper) GetRegistries() (registered, unRegistered, totalRegistries float64) {
 	return as.ami.GetRegistries()
 }
+
+func (as *AsteriskScraper) GetCallsByTrunkAndDirection() (map[string]ami.CallsDirectionRegistry, error) {
+	return as.ami.GetInboundAndOutboundCallsPerTrunk()
+}

@@ -16,6 +16,11 @@ type Ami struct {
 	cl   *amigo.Amigo
 }
 
+type CallsDirectionRegistry struct {
+	Inbound  int
+	Outbound int
+}
+
 // TODO: add support for PJSIP
 
 func NewAmi(conf config.Config, log *slog.Logger) (*Ami, error) {
@@ -109,9 +114,11 @@ func (a *Ami) GetActiveAndTotalCalls() (float64, float64) {
 		return -1, -1
 	}
 
-	// TODO: remove after testing
-	a.coreShowChannelsTest()
 	return active, total
+}
+
+func (a *Ami) GetInboundAndOutboundCallsPerTrunk() (map[string]CallsDirectionRegistry, error) {
+	return a.coreShowChannelsTest()
 }
 
 func (a *Ami) GetExtensions() (float64, float64, float64) {
@@ -193,27 +200,24 @@ func (a *Ami) getActiveAndTotalCalls() (float64, float64, error) {
 	return activeCalls, totalCalls, nil
 }
 
-func (a *Ami) coreShowChannelsTest() {
-	type calls struct {
-		inbound  int
-		outbound int
-	}
+func (a *Ami) coreShowChannelsTest() (map[string]CallsDirectionRegistry, error) {
 
 	showChannWaiter := make(chan struct{})
 	peerListWaiter := make(chan struct{})
 	peerListsNumber := 0
-	trunkNames := make(map[string]calls)
+	trunkCallRegistry := make(map[string]CallsDirectionRegistry)
 
+	// TODO: add error handlers
 	a.cl.RegisterHandler("CoreShowChannel", func(m map[string]string) {
 		//spew.Dump(m)
 		if m["ApplicationData"] != "(Outgoing Line)" {
-			for trunk, callReg := range trunkNames {
+			for trunk, callReg := range trunkCallRegistry {
 				if strings.Contains(m["ApplicationData"], trunk) {
-					callReg.outbound++
-					trunkNames[trunk] = callReg
+					callReg.Outbound++
+					trunkCallRegistry[trunk] = callReg
 				} else if strings.Contains(m["Channel"], trunk) {
-					callReg.inbound++
-					trunkNames[trunk] = callReg
+					callReg.Inbound++
+					trunkCallRegistry[trunk] = callReg
 				}
 			}
 		}
@@ -235,7 +239,7 @@ func (a *Ami) coreShowChannelsTest() {
 
 		if m["Dynamic"] == "no" {
 			trunkName = fmt.Sprintf("%s/%s", chanType, m["ObjectName"])
-			trunkNames[trunkName] = calls{}
+			trunkCallRegistry[trunkName] = CallsDirectionRegistry{}
 		}
 	})
 
@@ -253,36 +257,30 @@ func (a *Ami) coreShowChannelsTest() {
 		"Action": "IAXpeerlist",
 	})
 	if err != nil {
-		a.log.Error("could not run iaxpeers ami command")
-		return
+		return nil, fmt.Errorf("could not run iaxpeers ami command: %w", err)
 	}
 
 	_, err = a.cl.Action(map[string]string{
 		"Action": "SIPpeers",
 	})
 	if err != nil {
-		a.log.Error("could not run sippeers ami command")
-		return
+		return nil, fmt.Errorf("could not run sippeers ami command: %w", err)
 	}
 	_, err = a.cl.Action(map[string]string{
 		"Action": "CoreShowChannels",
 	})
 	if err != nil {
-		a.log.Error("could not run core show channels ami command", "err", err)
-		return
+		return nil, fmt.Errorf("could not run core show channels ami command: %w", err)
 	}
 
 	<-peerListWaiter
 	<-showChannWaiter
 
-	for trunk, callsInfo := range trunkNames {
-		fmt.Printf("TRUNK_NAME: %s OUTBOUND: %d INBOUND %d\n", trunk, callsInfo.outbound, callsInfo.inbound)
-	}
+	// TODO: defer after every register
+	a.cl.UnregisterHandler("CoreShowChannel", func(m map[string]string) {})
+	a.cl.UnregisterHandler("CoreShowChannelsComplete", func(m map[string]string) {})
+	a.cl.UnregisterHandler("PeerlistComplete", func(m map[string]string) {})
+	a.cl.UnregisterHandler("PeerEntry", func(m map[string]string) {})
 
-	defer func() {
-		a.cl.UnregisterHandler("CoreShowChannel", func(m map[string]string) {})
-		a.cl.UnregisterHandler("CoreShowChannelsComplete", func(m map[string]string) {})
-		a.cl.UnregisterHandler("PeerlistComplete", func(m map[string]string) {})
-		a.cl.UnregisterHandler("PeerEntry", func(m map[string]string) {})
-	}()
+	return trunkCallRegistry, nil
 }

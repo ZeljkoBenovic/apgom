@@ -24,7 +24,7 @@ type MetricsAsterisk struct {
 	hostName string
 	hostIP   string
 
-	activeCalls *prometheus.GaugeVec
+	activeCalls prometheus.Gauge
 	totalCalls  prometheus.Gauge
 
 	totalPeers       prometheus.Gauge
@@ -34,6 +34,8 @@ type MetricsAsterisk struct {
 	totalRegistries        prometheus.Gauge
 	registeredRegistries   prometheus.Gauge
 	unregisteredRegistries prometheus.Gauge
+
+	callsPerTrunk *prometheus.GaugeVec
 }
 
 var (
@@ -84,12 +86,19 @@ func NewMetricsAsterisk(ctx context.Context, log *slog.Logger, conf config.Confi
 }
 
 func (m *MetricsAsterisk) ActiveCalls() error {
-	m.activeCalls = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	ac := promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "asterisk",
 		Subsystem: "calls",
 		Name:      "active",
 		Help:      "The number of active calls",
 	}, commonLabels)
+
+	gauge, err := ac.GetMetricWithLabelValues(m.hostName, m.hostIP)
+	if err != nil {
+		return err
+	}
+
+	m.activeCalls = gauge
 
 	return nil
 }
@@ -219,6 +228,16 @@ func (m *MetricsAsterisk) UnRegisteredRegistries() error {
 	return nil
 }
 
+func (m *MetricsAsterisk) CallsPerTrunk() {
+	labels := append(commonLabels, "trunk_name", "call_direction")
+	m.callsPerTrunk = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "asterisk",
+		Subsystem: "calls",
+		Name:      "trunk",
+		Help:      "Total calls per trunk with",
+	}, labels)
+}
+
 func (m *MetricsAsterisk) RunAsteriskMetricsCollector() {
 	for {
 		select {
@@ -228,13 +247,29 @@ func (m *MetricsAsterisk) RunAsteriskMetricsCollector() {
 			availablePeers, unavailablePeers, totalPeers := m.asteriskScraper.GetExtensions()
 			registeredRegistries, unRegisteredRegistries, totalRegistries := m.asteriskScraper.GetRegistries()
 
-			ac, err := m.activeCalls.GetMetricWithLabelValues(m.hostName, m.hostIP)
+			callsPerTrunk, err := m.asteriskScraper.GetCallsByTrunkAndDirection()
 			if err != nil {
-				m.log.Error("error creating active calls gauge", "err", err)
+				m.log.Error("could not get calls by trunk: %w", err)
 			} else {
-				ac.Set(activeCalls)
+				for trunkName, callInfo := range callsPerTrunk {
+					outboundCalls, err := m.callsPerTrunk.GetMetricWithLabelValues(m.hostName, m.hostIP, trunkName, "outbound")
+					if err != nil {
+						m.log.Error("could not get outbound calls per trunk gauge", "err", err.Error())
+						continue
+					}
+
+					inboundCalls, err := m.callsPerTrunk.GetMetricWithLabelValues(m.hostName, m.hostIP, trunkName, "inbound")
+					if err != nil {
+						m.log.Error("could not get inbound calls per trunk gauge", "err", err.Error())
+						continue
+					}
+
+					outboundCalls.Set(float64(callInfo.Outbound))
+					inboundCalls.Set(float64(callInfo.Inbound))
+				}
 			}
 
+			m.activeCalls.Set(activeCalls)
 			m.totalCalls.Set(totalCalls)
 			m.totalPeers.Set(totalPeers)
 			m.availablePeers.Set(availablePeers)
