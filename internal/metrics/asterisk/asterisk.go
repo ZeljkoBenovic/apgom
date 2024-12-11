@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZeljkoBenovic/apgom/internal/config"
 	"github.com/ZeljkoBenovic/apgom/internal/scrapers/asterisk"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -17,12 +18,13 @@ import (
 type MetricsAsterisk struct {
 	ctx             context.Context
 	log             *slog.Logger
+	conf            config.Config
 	asteriskScraper *asterisk.AsteriskScraper
 
 	hostName string
 	hostIP   string
 
-	activeCalls prometheus.Gauge
+	activeCalls *prometheus.GaugeVec
 	totalCalls  prometheus.Gauge
 
 	totalPeers       prometheus.Gauge
@@ -38,7 +40,7 @@ var (
 	commonLabels = []string{"hostname", "host_ips"}
 )
 
-func NewMetricsAsterisk(ctx context.Context, log *slog.Logger, asteriskScraper *asterisk.AsteriskScraper) (*MetricsAsterisk, error) {
+func NewMetricsAsterisk(ctx context.Context, log *slog.Logger, conf config.Config, asteriskScraper *asterisk.AsteriskScraper) (*MetricsAsterisk, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("could not get hostname: %w", err)
@@ -73,6 +75,7 @@ func NewMetricsAsterisk(ctx context.Context, log *slog.Logger, asteriskScraper *
 	return &MetricsAsterisk{
 		ctx:             ctx,
 		log:             log,
+		conf:            conf,
 		asteriskScraper: asteriskScraper,
 		hostName:        hostname,
 		// trim the comma at the end of the string
@@ -81,19 +84,12 @@ func NewMetricsAsterisk(ctx context.Context, log *slog.Logger, asteriskScraper *
 }
 
 func (m *MetricsAsterisk) ActiveCalls() error {
-	ac := promauto.NewGaugeVec(prometheus.GaugeOpts{
+	m.activeCalls = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "asterisk",
 		Subsystem: "calls",
 		Name:      "active",
 		Help:      "The number of active calls",
 	}, commonLabels)
-
-	gauge, err := ac.GetMetricWithLabelValues(m.hostName, m.hostIP)
-	if err != nil {
-		return err
-	}
-
-	m.activeCalls = gauge
 
 	return nil
 }
@@ -226,13 +222,19 @@ func (m *MetricsAsterisk) UnRegisteredRegistries() error {
 func (m *MetricsAsterisk) RunAsteriskMetricsCollector() {
 	for {
 		select {
-		case <-time.After(time.Second * 1):
+		case <-time.After(time.Second * time.Duration(m.conf.ScrapeTimeSec)):
 			// TODO: set debug log for when scraping stops
 			activeCalls, totalCalls := m.asteriskScraper.GetActiveAndTotalCalls()
 			availablePeers, unavailablePeers, totalPeers := m.asteriskScraper.GetExtensions()
 			registeredRegistries, unRegisteredRegistries, totalRegistries := m.asteriskScraper.GetRegistries()
 
-			m.activeCalls.Set(activeCalls)
+			ac, err := m.activeCalls.GetMetricWithLabelValues(m.hostName, m.hostIP)
+			if err != nil {
+				m.log.Error("error creating active calls gauge", "err", err)
+			} else {
+				ac.Set(activeCalls)
+			}
+
 			m.totalCalls.Set(totalCalls)
 			m.totalPeers.Set(totalPeers)
 			m.availablePeers.Set(availablePeers)

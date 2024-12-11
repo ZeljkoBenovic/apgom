@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/ZeljkoBenovic/apgom/internal/ami"
+	"github.com/ZeljkoBenovic/apgom/internal/config"
 	"github.com/ZeljkoBenovic/apgom/internal/metrics/asterisk"
 	scraperAsterisk "github.com/ZeljkoBenovic/apgom/internal/scrapers/asterisk"
 )
@@ -15,8 +16,8 @@ type Metrics struct {
 	asteriskMetrics *asterisk.MetricsAsterisk
 }
 
-func NewMetrics(ctx context.Context, log *slog.Logger, ami *ami.Ami) (*Metrics, error) {
-	asteriskMetrics, err := asterisk.NewMetricsAsterisk(ctx, log.With("module", "metrics.asterisk"), scraperAsterisk.NewAsteriskScraper(ami))
+func NewMetrics(ctx context.Context, log *slog.Logger, conf config.Config, ami *ami.Ami) (*Metrics, error) {
+	asteriskMetrics, err := asterisk.NewMetricsAsterisk(ctx, log.With("module", "metrics.asterisk"), conf, scraperAsterisk.NewAsteriskScraper(ami))
 	if err != nil {
 		return nil, err
 	}

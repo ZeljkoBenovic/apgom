@@ -33,7 +33,7 @@ func NewApp(conf config.Config) App {
 
 	go handleOsSignals(log)
 
-	mtrsc, err := metrics.NewMetrics(ctx, log, am)
+	mtrsc, err := metrics.NewMetrics(ctx, log, conf, am)
 	if err != nil {
 		log.Error("could not setup new metrics", "err", err)
 		os.Exit(1)

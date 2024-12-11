@@ -12,6 +12,7 @@ type Config struct {
 	AsteriskAMIHost       string
 	AsteriskAMIUser       string
 	AsteriskAMIPass       string
+	ScrapeTimeSec         int
 }
 
 func NewConfig() Config {
@@ -23,6 +24,7 @@ func NewConfig() Config {
 	flag.StringVar(&c.AsteriskAMIHost, "ami-host", "localhost", "asterisk ami hostname or ip")
 	flag.StringVar(&c.AsteriskAMIUser, "ami-user", "admin", "asterisk ami username")
 	flag.StringVar(&c.AsteriskAMIPass, "ami-pass", "", "asterisk ami password")
+	flag.IntVar(&c.ScrapeTimeSec, "scrape-time", 1, "metrics scrape time in seconds which is usually aligned with Prometheus scraper time")
 	flag.Parse()
 
 	if c.AsteriskAMIPass == "" {

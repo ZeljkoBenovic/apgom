@@ -109,6 +109,8 @@ func (a *Ami) GetActiveAndTotalCalls() (float64, float64) {
 		return -1, -1
 	}
 
+	// TODO: remove after testing
+	a.coreShowChannelsTest()
 	return active, total
 }
 
@@ -189,4 +191,98 @@ func (a *Ami) getActiveAndTotalCalls() (float64, float64, error) {
 	}
 
 	return activeCalls, totalCalls, nil
+}
+
+func (a *Ami) coreShowChannelsTest() {
+	type calls struct {
+		inbound  int
+		outbound int
+	}
+
+	showChannWaiter := make(chan struct{})
+	peerListWaiter := make(chan struct{})
+	peerListsNumber := 0
+	trunkNames := make(map[string]calls)
+
+	a.cl.RegisterHandler("CoreShowChannel", func(m map[string]string) {
+		//spew.Dump(m)
+		if m["ApplicationData"] != "(Outgoing Line)" {
+			for trunk, callReg := range trunkNames {
+				if strings.Contains(m["ApplicationData"], trunk) {
+					callReg.outbound++
+					trunkNames[trunk] = callReg
+				} else if strings.Contains(m["Channel"], trunk) {
+					callReg.inbound++
+					trunkNames[trunk] = callReg
+				}
+			}
+		}
+	})
+
+	a.cl.RegisterHandler("CoreShowChannelsComplete", func(m map[string]string) {
+		close(showChannWaiter)
+	})
+
+	a.cl.RegisterHandler("PeerEntry", func(m map[string]string) {
+		var trunkName string
+		var chanType string
+
+		if m["Channeltype"] == "IAX" {
+			chanType = "IAX2"
+		} else {
+			chanType = m["Channeltype"]
+		}
+
+		if m["Dynamic"] == "no" {
+			trunkName = fmt.Sprintf("%s/%s", chanType, m["ObjectName"])
+			trunkNames[trunkName] = calls{}
+		}
+	})
+
+	a.cl.RegisterHandler("PeerlistComplete", func(m map[string]string) {
+		peerListsNumber++
+
+		// TODO: add PJSIP peer list
+		if peerListsNumber == 2 {
+			close(peerListWaiter)
+		}
+
+	})
+
+	_, err := a.cl.Action(map[string]string{
+		"Action": "IAXpeerlist",
+	})
+	if err != nil {
+		a.log.Error("could not run iaxpeers ami command")
+		return
+	}
+
+	_, err = a.cl.Action(map[string]string{
+		"Action": "SIPpeers",
+	})
+	if err != nil {
+		a.log.Error("could not run sippeers ami command")
+		return
+	}
+	_, err = a.cl.Action(map[string]string{
+		"Action": "CoreShowChannels",
+	})
+	if err != nil {
+		a.log.Error("could not run core show channels ami command", "err", err)
+		return
+	}
+
+	<-peerListWaiter
+	<-showChannWaiter
+
+	for trunk, callsInfo := range trunkNames {
+		fmt.Printf("TRUNK_NAME: %s OUTBOUND: %d INBOUND %d\n", trunk, callsInfo.outbound, callsInfo.inbound)
+	}
+
+	defer func() {
+		a.cl.UnregisterHandler("CoreShowChannel", func(m map[string]string) {})
+		a.cl.UnregisterHandler("CoreShowChannelsComplete", func(m map[string]string) {})
+		a.cl.UnregisterHandler("PeerlistComplete", func(m map[string]string) {})
+		a.cl.UnregisterHandler("PeerEntry", func(m map[string]string) {})
+	}()
 }
