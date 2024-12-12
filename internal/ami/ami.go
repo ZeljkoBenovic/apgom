@@ -197,7 +197,7 @@ func (a *Ami) getActiveAndTotalCalls() (float64, float64, error) {
 		return -1, -1, err
 	}
 
-	return activeCalls, totalCalls, nil
+	return activeCalls / 2, totalCalls / 2, nil
 }
 
 func (a *Ami) coreShowChannelsTest() (map[string]CallsDirectionRegistry, error) {

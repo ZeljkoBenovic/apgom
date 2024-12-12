@@ -3,3 +3,6 @@ run:
 
 build:
 	CGO_ENABLED=0 GOOS="linux" GOARCH="amd64" go build -o apgom -ldflags '-s -w -extldflags "-static"' main.go
+
+build-legacy:
+	CGO_ENABLED=0 GOOS="linux" GOARCH="386" go build -o apgom -ldflags '-s -w -extldflags "-static"' main.go
