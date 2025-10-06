@@ -19,9 +19,10 @@ type Ami struct {
 }
 
 type PeerStatus struct {
-	Name   string
-	IP     string
-	Status string
+	Name      string
+	IP        string
+	Status    string
+	LatencyMs float64
 }
 
 // TODO: add support for PJSIP
@@ -133,10 +134,23 @@ func (a *Ami) GetPeerStatus() []PeerStatus {
 			break
 		}
 
+		var statusMs int
+		var statusString string
+
+		status := strings.Split(m["Status"], " ")
+		statusString = status[0]
+
+		if len(status) == 1 {
+			statusMs = -1
+		} else {
+			statusMs, _ = strconv.Atoi(status[1][1:])
+		}
+
 		resp = append(resp, PeerStatus{
-			Name:   m["ObjectName"],
-			IP:     m["IPaddress"],
-			Status: m["Status"],
+			Name:      m["ObjectName"],
+			IP:        m["IPaddress"],
+			Status:    statusString,
+			LatencyMs: float64(statusMs),
 		})
 	}
 

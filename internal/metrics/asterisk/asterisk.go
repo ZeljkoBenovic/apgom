@@ -257,7 +257,7 @@ func (m *MetricsAsterisk) RunAsteriskMetricsCollector() {
 			// labels contain peer information so the value will always be the same
 			for _, p := range peerStatus {
 				ps, _ := m.peerStatus.GetMetricWithLabelValues(m.hostName, m.hostIP, p.IP, p.Name, p.Status)
-				ps.Set(1)
+				ps.Set(p.LatencyMs)
 			}
 		case <-m.ctx.Done():
 			return
