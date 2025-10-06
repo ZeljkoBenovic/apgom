@@ -23,3 +23,7 @@ func (as *AsteriskScraper) GetExtensions() (availableExtensions, unavailableExte
 func (as *AsteriskScraper) GetRegistries() (registered, unRegistered, totalRegistries float64) {
 	return as.ami.GetRegistries()
 }
+
+func (as *AsteriskScraper) GetPeerStatus() []ami.PeerStatus {
+	return as.ami.GetPeerStatus()
+}

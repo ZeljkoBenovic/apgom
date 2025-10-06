@@ -14,6 +14,14 @@ type Ami struct {
 	conf config.Config
 	log  *slog.Logger
 	cl   *amigo.Amigo
+
+	peerStatusCh chan map[string]string
+}
+
+type PeerStatus struct {
+	Name   string
+	IP     string
+	Status string
 }
 
 // TODO: add support for PJSIP
@@ -44,9 +52,10 @@ func NewAmi(conf config.Config, log *slog.Logger) (*Ami, error) {
 	}
 
 	return &Ami{
-		conf: conf,
-		log:  log,
-		cl:   cl,
+		conf:         conf,
+		log:          log,
+		cl:           cl,
+		peerStatusCh: make(chan map[string]string, 100),
 	}, nil
 }
 
@@ -112,6 +121,28 @@ func (a *Ami) GetActiveAndTotalCalls() (float64, float64) {
 	return active, total
 }
 
+func (a *Ami) GetPeerStatus() []PeerStatus {
+	var resp []PeerStatus
+
+	if a.peerStatusCh == nil {
+		a.peerStatusCh = make(chan map[string]string)
+	}
+
+	for m := range a.peerStatusCh {
+		if m == nil {
+			break
+		}
+
+		resp = append(resp, PeerStatus{
+			Name:   m["ObjectName"],
+			IP:     m["IPaddress"],
+			Status: m["Status"],
+		})
+	}
+
+	return resp
+}
+
 func (a *Ami) GetExtensions() (float64, float64, float64) {
 	var (
 		errCh               = make(chan error)
@@ -121,6 +152,8 @@ func (a *Ami) GetExtensions() (float64, float64, float64) {
 		unavailabExtensions float64
 	)
 	if err := a.cl.RegisterHandler("PeerEntry", func(m map[string]string) {
+		a.peerStatusCh <- m
+
 		if m["Dynamic"] == "yes" {
 			if strings.Contains(m["Status"], "OK") {
 				availableExtensions++
@@ -135,6 +168,7 @@ func (a *Ami) GetExtensions() (float64, float64, float64) {
 	}
 
 	if err := a.cl.RegisterHandler("PeerlistComplete", func(m map[string]string) {
+		a.peerStatusCh <- nil
 		doneCh <- struct{}{}
 	}); err != nil {
 		errCh <- fmt.Errorf("could not register peerlist complete handler: %w", err)
@@ -172,6 +206,13 @@ func (a *Ami) getActiveAndTotalCalls() (float64, float64, error) {
 	})
 	if err != nil {
 		a.log.Error("could not run ami command", "err", err)
+	}
+
+	// Asterisk 16.21.1
+	if _, ok := resp["CommandResponse"]; !ok {
+		split := strings.Split(resp["Output"], " ")
+		totalInt, _ := strconv.Atoi(split[0])
+		return -1, float64(totalInt), nil
 	}
 
 	cmdRespArr := strings.Split(resp["CommandResponse"], "\n")

@@ -28,6 +28,7 @@ type MetricsAsterisk struct {
 	totalPeers       prometheus.Gauge
 	availablePeers   prometheus.Gauge
 	unavailablePeers prometheus.Gauge
+	peerStatus       *prometheus.GaugeVec
 
 	totalRegistries        prometheus.Gauge
 	registeredRegistries   prometheus.Gauge
@@ -223,15 +224,28 @@ func (m *MetricsAsterisk) UnRegisteredRegistries() error {
 	return nil
 }
 
+func (m *MetricsAsterisk) PeerStatus() error {
+	ps := promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "asterisk",
+		Subsystem: "peers",
+		Name:      "status",
+		Help:      "SIP peer status",
+	}, append(commonLabels, "peer_ip", "peer_name", "status"))
+
+	m.peerStatus = ps
+
+	return nil
+}
+
 func (m *MetricsAsterisk) RunAsteriskMetricsCollector() {
 	for {
 		select {
-		case <-time.After(time.Second * 1):
+		case <-time.After(time.Second * 2):
 			// TODO: set debug log for when scraping stops
 			activeCalls, totalCalls := m.asteriskScraper.GetActiveAndTotalCalls()
 			availablePeers, unavailablePeers, totalPeers := m.asteriskScraper.GetExtensions()
 			registeredRegistries, unRegisteredRegistries, totalRegistries := m.asteriskScraper.GetRegistries()
-
+			peerStatus := m.asteriskScraper.GetPeerStatus()
 			m.activeCalls.Set(activeCalls)
 			m.totalCalls.Set(totalCalls)
 			m.totalPeers.Set(totalPeers)
@@ -240,6 +254,11 @@ func (m *MetricsAsterisk) RunAsteriskMetricsCollector() {
 			m.registeredRegistries.Set(registeredRegistries)
 			m.unregisteredRegistries.Set(unRegisteredRegistries)
 			m.totalRegistries.Set(totalRegistries)
+			// labels contain peer information so the value will always be the same
+			for _, p := range peerStatus {
+				ps, _ := m.peerStatus.GetMetricWithLabelValues(m.hostName, m.hostIP, p.IP, p.Name, p.Status)
+				ps.Set(1)
+			}
 		case <-m.ctx.Done():
 			return
 		}
