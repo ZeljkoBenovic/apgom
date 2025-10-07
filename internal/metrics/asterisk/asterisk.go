@@ -230,7 +230,7 @@ func (m *MetricsAsterisk) PeerStatus() error {
 		Subsystem: "peers",
 		Name:      "status",
 		Help:      "SIP peer status",
-	}, append(commonLabels, "peer_ip", "peer_name", "status"))
+	}, append(commonLabels, "peer_ip", "peer_name"))
 
 	m.peerStatus = ps
 
@@ -256,7 +256,7 @@ func (m *MetricsAsterisk) RunAsteriskMetricsCollector() {
 			m.totalRegistries.Set(totalRegistries)
 			// labels contain peer information so the value will always be the same
 			for _, p := range peerStatus {
-				ps, _ := m.peerStatus.GetMetricWithLabelValues(m.hostName, m.hostIP, p.IP, p.Name, p.Status)
+				ps, _ := m.peerStatus.GetMetricWithLabelValues(m.hostName, m.hostIP, p.IP, p.Name)
 				ps.Set(p.LatencyMs)
 			}
 		case <-m.ctx.Done():
