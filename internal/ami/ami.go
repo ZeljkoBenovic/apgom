@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ZeljkoBenovic/apgom/internal/config"
 	"github.com/ivahaev/amigo"
@@ -188,6 +189,10 @@ func (a *Ami) GetExtensions() (float64, float64, float64) {
 	}
 
 	if err := a.cl.RegisterHandler("PeerlistComplete", func(m map[string]string) {
+		// as we're catching two different peerlistcomplete events they can arrive at the same time
+		// so we set up an artificial delay
+		time.Sleep(time.Millisecond * 10)
+
 		switch m["ActionID"] {
 		case sipPeersActionID:
 			closedChCounter++
@@ -196,9 +201,8 @@ func (a *Ami) GetExtensions() (float64, float64, float64) {
 		}
 
 		if closedChCounter == 2 {
-			doneCh <- struct{}{}
-
 			a.peerStatusCh <- nil
+			doneCh <- struct{}{}
 		}
 	}); err != nil {
 		errCh <- fmt.Errorf("could not register peerlist complete handler: %w", err)
