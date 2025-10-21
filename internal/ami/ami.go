@@ -23,6 +23,7 @@ type PeerStatus struct {
 	IP        string
 	Status    string
 	LatencyMs float64
+	Tech      string
 }
 
 // TODO: add support for PJSIP
@@ -151,6 +152,7 @@ func (a *Ami) GetPeerStatus() []PeerStatus {
 			IP:        m["IPaddress"],
 			Status:    statusString,
 			LatencyMs: float64(statusMs),
+			Tech:      m["Channeltype"],
 		})
 	}
 
@@ -164,7 +166,11 @@ func (a *Ami) GetExtensions() (float64, float64, float64) {
 		peers               []map[string]string
 		availableExtensions float64
 		unavailabExtensions float64
+		iaxPeersActionID    string
+		sipPeersActionID    string
+		closedChCounter     int
 	)
+
 	if err := a.cl.RegisterHandler("PeerEntry", func(m map[string]string) {
 		a.peerStatusCh <- m
 
@@ -182,8 +188,18 @@ func (a *Ami) GetExtensions() (float64, float64, float64) {
 	}
 
 	if err := a.cl.RegisterHandler("PeerlistComplete", func(m map[string]string) {
-		a.peerStatusCh <- nil
-		doneCh <- struct{}{}
+		switch m["ActionID"] {
+		case sipPeersActionID:
+			closedChCounter++
+		case iaxPeersActionID:
+			closedChCounter++
+		}
+
+		if closedChCounter == 2 {
+			doneCh <- struct{}{}
+
+			a.peerStatusCh <- nil
+		}
 	}); err != nil {
 		errCh <- fmt.Errorf("could not register peerlist complete handler: %w", err)
 	}
@@ -196,11 +212,21 @@ func (a *Ami) GetExtensions() (float64, float64, float64) {
 		}
 	}()
 
-	if _, err := a.cl.Action(map[string]string{
+	sipPeersRes, err := a.cl.Action(map[string]string{
 		"Action": "SIPPeers",
-	}); err != nil {
+	})
+	if err != nil {
 		errCh <- fmt.Errorf("could run sippeers action: %w", err)
 	}
+	sipPeersActionID = sipPeersRes["ActionID"]
+
+	iaxPeersRes, err := a.cl.Action(map[string]string{
+		"Action": "IAXpeerlist",
+	})
+	if err != nil {
+		errCh <- fmt.Errorf("could not send iaxpeer action: %w", err)
+	}
+	iaxPeersActionID = iaxPeersRes["ActionID"]
 
 	for {
 		select {

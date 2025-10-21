@@ -230,7 +230,7 @@ func (m *MetricsAsterisk) PeerStatus() error {
 		Subsystem: "peers",
 		Name:      "status",
 		Help:      "SIP peer status",
-	}, append(commonLabels, "peer_ip", "peer_name"))
+	}, append(commonLabels, "peer_ip", "peer_name", "peer_tech"))
 
 	m.peerStatus = ps
 
@@ -241,6 +241,7 @@ func (m *MetricsAsterisk) RunAsteriskMetricsCollector() {
 	for {
 		select {
 		case <-time.After(time.Second * 2):
+			m.log.Info("Scraping metrics...", "time", time.Now().Format(time.Stamp))
 			// TODO: set debug log for when scraping stops
 			activeCalls, totalCalls := m.asteriskScraper.GetActiveAndTotalCalls()
 			availablePeers, unavailablePeers, totalPeers := m.asteriskScraper.GetExtensions()
@@ -256,7 +257,7 @@ func (m *MetricsAsterisk) RunAsteriskMetricsCollector() {
 			m.totalRegistries.Set(totalRegistries)
 			// labels contain peer information so the value will always be the same
 			for _, p := range peerStatus {
-				ps, _ := m.peerStatus.GetMetricWithLabelValues(m.hostName, m.hostIP, p.IP, p.Name)
+				ps, _ := m.peerStatus.GetMetricWithLabelValues(m.hostName, m.hostIP, p.IP, p.Name, p.Tech)
 				ps.Set(p.LatencyMs)
 			}
 		case <-m.ctx.Done():
